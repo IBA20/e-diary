@@ -1,10 +1,14 @@
 from random import choice
+
+from django.core.exceptions import MultipleObjectsReturned
+
 from datacenter.models import (
     Schoolkid,
     Mark,
     Chastisement,
     Commendation,
     Lesson,
+    Subject
 )
 
 
@@ -20,20 +24,13 @@ def get_commendation_text() -> str:
     )
 
 
-def get_schoolkid(name: str) -> [Schoolkid, None]:
-    name_parts = name.split()
-    queryset = Schoolkid.objects.all()
-    for name_part in name_parts:
-        queryset = queryset.filter(full_name__contains=name_part)
-    if len(queryset) != 1:
-        return
-    return queryset.first()
-
-
 def fix_marks(name: str) -> [None, str]:
-    schoolkid = get_schoolkid(name)
-    if not schoolkid:
-        return 'Уточните имя ученика'
+    try:
+        schoolkid = Schoolkid.objects.get(full_name__contains=name)
+    except MultipleObjectsReturned:
+        return 'Найдено несколько учеников. Уточните поиск'
+    except Schoolkid.DoesNotExist:
+        return 'Ученик не найден'
     Mark.objects.filter(
         schoolkid=schoolkid,
         points__in=[2, 3]
@@ -41,23 +38,39 @@ def fix_marks(name: str) -> [None, str]:
 
 
 def remove_chastisements(name: str) -> [None, str]:
-    schoolkid = get_schoolkid(name)
-    if not schoolkid:
-        return 'Уточните имя ученика'
+    try:
+        schoolkid = Schoolkid.objects.get(full_name__contains=name)
+    except MultipleObjectsReturned:
+        return 'Найдено несколько учеников. Уточните поиск'
+    except Schoolkid.DoesNotExist:
+        return 'Ученик не найден'
     Chastisement.objects.filter(schoolkid=schoolkid).delete()
 
 
 def create_commendation(name: str, subject_title: str) -> [None, str]:
-    schoolkid = get_schoolkid(name)
-    if not schoolkid:
-        return 'Уточните имя ученика'
+    try:
+        schoolkid = Schoolkid.objects.get(full_name__contains=name)
+    except MultipleObjectsReturned:
+        return 'Найдено несколько учеников. Уточните поиск'
+    except Schoolkid.DoesNotExist:
+        return 'Ученик не найден'
+
+    try:
+        subject = Subject.objects.get(
+            title=subject_title,
+            year_of_study=schoolkid.year_of_study
+        )
+    except Subject.DoesNotExist:
+        return 'Предмет не найден'
+
     lesson = Lesson.objects.filter(
         year_of_study=schoolkid.year_of_study,
         group_letter=schoolkid.group_letter,
-        subject__title=subject_title
+        subject=subject
     ).order_by('date').last()
     if not lesson:
-        return 'Предмет/урок не найден'
+        return 'Урок не найден'
+
     Commendation.objects.create(
         text=get_commendation_text(),
         created=lesson.date,
