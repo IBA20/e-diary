@@ -12,6 +12,19 @@ from datacenter.models import (
 )
 
 
+class DbSearchError(RuntimeError):
+    pass
+
+
+def get_schoolkid(name):
+    try:
+        return Schoolkid.objects.get(full_name__contains=name)
+    except MultipleObjectsReturned:
+        raise DbSearchError('Найдено несколько учеников. Уточните поиск')
+    except Schoolkid.DoesNotExist:
+        raise DbSearchError('Ученик не найден')
+
+
 def get_commendation_text() -> str:
     return choice(
         (
@@ -26,40 +39,32 @@ def get_commendation_text() -> str:
 
 def fix_marks(name: str) -> [None, str]:
     try:
-        schoolkid = Schoolkid.objects.get(full_name__contains=name)
-    except MultipleObjectsReturned:
-        return 'Найдено несколько учеников. Уточните поиск'
-    except Schoolkid.DoesNotExist:
-        return 'Ученик не найден'
-    Mark.objects.filter(
-        schoolkid=schoolkid,
-        points__in=[2, 3]
-    ).update(points=5)
+        schoolkid = get_schoolkid(name)
+        Mark.objects.filter(
+            schoolkid=schoolkid,
+            points__in=[2, 3]
+        ).update(points=5)
+    except DbSearchError as err:
+        return err.args[0]
 
 
 def remove_chastisements(name: str) -> [None, str]:
     try:
-        schoolkid = Schoolkid.objects.get(full_name__contains=name)
-    except MultipleObjectsReturned:
-        return 'Найдено несколько учеников. Уточните поиск'
-    except Schoolkid.DoesNotExist:
-        return 'Ученик не найден'
-    Chastisement.objects.filter(schoolkid=schoolkid).delete()
+        schoolkid = get_schoolkid(name)
+        Chastisement.objects.filter(schoolkid=schoolkid).delete()
+    except DbSearchError as err:
+        return err.args[0]
 
 
 def create_commendation(name: str, subject_title: str) -> [None, str]:
     try:
-        schoolkid = Schoolkid.objects.get(full_name__contains=name)
-    except MultipleObjectsReturned:
-        return 'Найдено несколько учеников. Уточните поиск'
-    except Schoolkid.DoesNotExist:
-        return 'Ученик не найден'
-
-    try:
+        schoolkid = get_schoolkid(name)
         subject = Subject.objects.get(
             title=subject_title,
             year_of_study=schoolkid.year_of_study
         )
+    except DbSearchError as err:
+        return err.args[0]
     except Subject.DoesNotExist:
         return 'Предмет не найден'
 
