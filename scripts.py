@@ -64,9 +64,11 @@ def create_commendation(name: str, subject_title: str) -> [None, str]:
             year_of_study=schoolkid.year_of_study
         )
     except DbSearchError as err:
-        return err.args[0]
+        print(err.args[0])
+        return
     except Subject.DoesNotExist:
-        return 'Предмет не найден'
+        print('Предмет не найден')
+        return
 
     lesson = Lesson.objects.filter(
         year_of_study=schoolkid.year_of_study,
@@ -74,7 +76,8 @@ def create_commendation(name: str, subject_title: str) -> [None, str]:
         subject=subject
     ).order_by('date').last()
     if not lesson:
-        return 'Урок не найден'
+        print('Урок не найден')
+        return
 
     Commendation.objects.create(
         text=get_commendation_text(),
